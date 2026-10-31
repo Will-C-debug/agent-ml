@@ -15,7 +15,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=3.1",
     "langchain-anthropic>=1.7",
     "flaml[automl]>=2.7",
-    "scikit-learn>=1.5",
+    "scikit-learn>=1.6",  # GroupKFold(shuffle=...)
     "pandas>=2.2",
     "pyarrow>=16",
     "joblib>=1.4",

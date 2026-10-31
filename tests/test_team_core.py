@@ -85,11 +85,16 @@ def test_splits_are_disjoint_stratified_and_reproducible():
         assert (in_fold == "b").mean() == pytest.approx(0.25, abs=0.05)
 
 
-def test_group_splits_keep_groups_together():
+@pytest.mark.parametrize("task", ["classification", "regression"])
+def test_group_splits_keep_groups_together(task):
     rng = np.random.default_rng(0)
     groups = pd.Series(np.repeat(np.arange(80), 5))
-    y = pd.Series(rng.choice(["x", "y"], len(groups)))
-    frame = make_splits(y, "classification", test_size=0.2, n_folds=4, groups=groups)
+    if task == "classification":
+        y = pd.Series(rng.choice(["x", "y"], len(groups)))
+    else:
+        y = pd.Series(rng.normal(size=len(groups)))
+    frame = make_splits(y, task, test_size=0.2, n_folds=4, groups=groups)
+    assert (frame["subset"] == "test").mean() == pytest.approx(0.2, abs=0.05)
     by_group = frame.groupby(groups)
     assert (by_group["subset"].nunique() == 1).all()
     assert (by_group["sel_fold_0"].nunique() == 1).all()
