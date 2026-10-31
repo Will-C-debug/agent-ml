@@ -148,12 +148,19 @@ class TerminalUI:
         elif name != "run_python":
             self.console.print(f"[cyan]▸ {name}[/]([dim]{escape(_format_args(args))}[/])")
         if self.status:
-            label = {
-                "train_automl": f"Running AutoML search ({args.get('time_budget', 60)}s budget)…",
-                "explain_model": "Computing permutation importance…",
-                "run_python": "Running Python…",
-            }.get(name, f"Running {name}…")
-            self.status.update(label)
+            self.status.update(self.status_label(name, args))
+
+    def status_label(self, name: str, args: dict[str, Any]) -> str:
+        """Spinner text while a tool runs."""
+        return {
+            "train_automl": f"Running AutoML search ({args.get('time_budget', 60)}s budget)…",
+            "explain_model": "Computing permutation importance…",
+            "run_python": "Running Python…",
+        }.get(name, f"Running {name}…")
+
+    def summarize(self, name: str | None, data: Any) -> tuple[str | None, list[str]]:
+        """One-line summary (plus notable details) of a tool result."""
+        return _summarize_result(name, data)
 
     def _render_tool_result(self, message: ToolMessage) -> None:
         if self.status:
@@ -176,7 +183,7 @@ class TerminalUI:
             self.console.print(Padding(Text(output, style=style), (0, 0, 0, 4)))
             return
         try:
-            summary, details = _summarize_result(message.name, data)
+            summary, details = self.summarize(message.name, data)
         except (KeyError, TypeError, IndexError):
             summary, details = None, []
         self.console.print(
@@ -384,6 +391,20 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser("chat", parents=[common], help="Interactive session (default)")
     run = sub.add_parser("run", parents=[common], help="Run a single task and exit")
     run.add_argument("task", help="What the agent should do")
+    team = sub.add_parser(
+        "team",
+        parents=[common],
+        help="Six specialist agents search for the best scikit-learn model",
+        description="Planner, Data, Analysis, Modeling, Review and Visualization agents work "
+        "through the problem; every candidate is compared on identical CV folds and the winner "
+        "is evaluated once on a locked test set. Resume a run with --thread.",
+    )
+    team.add_argument("task", nargs="?", help="What to predict, and from which data")
+    team.add_argument("--yes", action="store_true", help="Start without asking to approve the plan")
+    team.add_argument(
+        "--budget-minutes", type=float, help="Compute budget for model search (default 15)"
+    )
+    team.add_argument("--max-iterations", type=int, help="Maximum review rounds (default 3)")
     return parser
 
 
@@ -400,6 +421,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     if not _check_credentials(settings, console):
         return 1
+    if args.get("command") == "team":
+        from ml_agent.team.cli import run_team
+
+        return run_team(args, settings, console)
 
     ws = Workspace(settings.workspace)
     agent, _ = build_agent(settings, checkpointer=open_checkpointer(ws))

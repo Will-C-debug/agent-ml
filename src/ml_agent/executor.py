@@ -34,6 +34,17 @@ def save_dataset(df, name, note=None):
     print(f"[saved dataset '{info['name']}': {info['rows']} rows x {len(info['columns'])} columns]")
     return info
 
+if os.environ.get("ML_AGENT_RUN_ID"):
+    # Inside an agent-team run: training rows only. The locked test set is not exposed.
+    from ml_agent.team.runs import RunStore
+
+    run = RunStore.open(ws, os.environ["ML_AGENT_RUN_ID"])
+    RUN_DIR = run.root
+
+    def load_train(prepared=True):
+        # Training rows of this run; with prepared=True, after the registered prepare(df).
+        return run.train_frame() if prepared else run.raw_train()
+
 pd.set_option("display.width", 160)
 pd.set_option("display.max_columns", 40)
 __file__ = sys.argv[1]
@@ -61,8 +72,13 @@ def _dataset_mtimes(ws: Workspace) -> dict[str, float]:
     return {p.stem: p.stat().st_mtime for p in ws.datasets_dir.glob("*.parquet")}
 
 
-def run_code(ws: Workspace, code: str, timeout: int = 300) -> dict[str, Any]:
-    """Execute ``code`` with the workspace as working directory and report what happened."""
+def run_code(
+    ws: Workspace, code: str, timeout: int = 300, run_id: str | None = None
+) -> dict[str, Any]:
+    """Execute ``code`` with the workspace as working directory and report what happened.
+
+    With ``run_id`` (agent-team runs), the script also gets ``RUN_DIR`` and ``load_train()``.
+    """
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     script = ws.scratch_dir / f"snippet_{stamp}.py"
     script.write_text(code)
@@ -71,6 +87,7 @@ def run_code(ws: Workspace, code: str, timeout: int = 300) -> dict[str, Any]:
         "ML_AGENT_WORKSPACE": str(ws.root),
         "MPLBACKEND": "Agg",
         "PYTHONUNBUFFERED": "1",
+        "ML_AGENT_RUN_ID": run_id or "",
     }
     before = _dataset_mtimes(ws)
     started = time.time()

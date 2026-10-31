@@ -8,6 +8,7 @@ Layout::
       predictions/    batch prediction outputs
       exports/        self-contained model bundles
       reports/        markdown reports written by the agent
+      runs/           multi-agent team runs (see ml_agent.team.runs)
       scratch/        code snippets executed by run_python
       .agent/         conversation checkpoints (SQLite)
 
@@ -92,6 +93,7 @@ class Workspace:
             self.predictions_dir,
             self.exports_dir,
             self.reports_dir,
+            self.runs_dir,
             self.scratch_dir,
             self.state_dir,
         ):
@@ -116,6 +118,10 @@ class Workspace:
     @property
     def reports_dir(self) -> Path:
         return self.root / "reports"
+
+    @property
+    def runs_dir(self) -> Path:
+        return self.root / "runs"
 
     @property
     def scratch_dir(self) -> Path:
